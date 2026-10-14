@@ -23,3 +23,9 @@ Tests: `for t in test_*.py; do .venv/bin/python $t; done`
 ## Backtest result 2026-10-13 (rv_expand, test = 2023→)
 AUC 0.67. p>0.5: 433 picks, 70% hit vs 32% base — but 80% of picks are earnings weeks.
 Excluding earnings weeks: 87 picks, 63% hit vs 29% base. Small n; treat as a hint.
+
+## GitHub Actions
+- `ci.yml`: runs `test_*.py` on every push.
+- `chain.yml`: records the options chain daily (weekdays 16:20 ET) on GitHub's runners into `data/chain.db` and commits it,
+  so recording doesn't depend on a laptop. Merge into the local DB:
+  `git pull && sqlite3 vol.db "attach 'data/chain.db' as c; insert or replace into chain select * from c.chain"`
