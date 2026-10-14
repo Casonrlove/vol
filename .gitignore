@@ -1,0 +1,6 @@
+.venv/
+*.db*
+*.log
+__pycache__/
+model_*.txt
+static/replay.json

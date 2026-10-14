@@ -1,0 +1,289 @@
+<title>Orb Console</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* Layout: fixed console grid — top bar, ticker, 3-column body (signals+log | orb | decisions), agent rail. Dark-only by design. */
+:root{
+  --bg:#070a12;--panel:#0b101c;--line:#1a2236;--fg:#c9d3e6;--dim:#5b6880;
+  --cyan:#3ddcff;--amber:#ffb347;--red:#ff4d5e;--green:#3ddc84;--violet:#9d7bff;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--fg);font:11px/1.45 var(--mono);font-variant-numeric:tabular-nums;padding-inline:0}
+*{box-sizing:border-box}
+.app{display:grid;grid-template-rows:38px 26px 1fr 190px;height:100%;gap:1px;background:var(--line)}
+.app>*{background:var(--bg);min-width:0}
+.top{display:flex;align-items:center;gap:18px;padding:0 14px}
+.logo{width:24px;height:24px;border:1px solid var(--cyan);color:var(--cyan);display:grid;place-items:center;font-weight:700;font-size:10px;border-radius:4px}
+.brand b{color:#fff;letter-spacing:.08em}.brand span{color:var(--dim);margin-left:10px}
+.stat{margin-left:auto;display:flex;gap:22px}.stat div{text-align:right}
+.lab{color:var(--dim);font-size:9px;letter-spacing:.14em;text-transform:uppercase}
+.big{color:#fff;font-size:14px;font-weight:500}
+.ticker{display:flex;align-items:center;overflow:hidden;white-space:nowrap}
+.ticker .tag{background:var(--red);color:#fff;font-weight:700;padding:0 10px;height:100%;display:flex;align-items:center;letter-spacing:.12em;font-size:9px;flex:none}
+.ticker .roll{display:flex;gap:28px;padding-left:16px;animation:roll 40s linear infinite}
+.ticker .roll span b{color:var(--cyan);font-weight:500}
+@keyframes roll{to{transform:translateX(-50%)}}
+.body{display:grid;grid-template-columns:300px 1fr 260px;gap:1px;background:var(--line);min-height:0}
+.body>*{background:var(--bg);min-width:0;min-height:0;overflow:hidden}
+.col{display:flex;flex-direction:column;gap:1px;background:var(--line)}
+.panel{background:var(--panel);padding:10px 12px;display:flex;flex-direction:column;min-height:0}
+.panel h2{margin:0 0 8px;font-size:9px;letter-spacing:.16em;text-transform:uppercase;color:var(--fg);display:flex;gap:8px;align-items:center}
+.panel h2 i{color:var(--cyan);font-style:normal}.panel h2 small{color:var(--dim);letter-spacing:.1em;font-weight:400;margin-left:auto}
+.huge{font-size:34px;color:var(--green);font-weight:500;line-height:1;margin:4px 0 6px;text-shadow:0 0 18px rgba(61,220,132,.35)}
+.kv{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.kv .big{font-size:13px}
+.kv .red{color:var(--red)}.kv .amber{color:var(--amber)}
+.sig{display:flex;align-items:center;gap:10px;padding:5px 0;border-top:1px solid var(--line)}
+.sig:first-of-type{border:0}
+.sig .name{width:92px;flex:none}.sig .name b{display:block;color:#fff;font-weight:500;font-size:10px}.sig .name span{color:var(--dim);font-size:9px}
+.sig canvas{flex:1;height:22px;min-width:0}
+.sig .val{width:48px;text-align:right;font-weight:500}
+.sig .who{font-size:8px;border:1px solid var(--line);padding:0 4px;color:var(--dim);border-radius:2px}
+.log{flex:1;overflow:hidden;font-size:10px;line-height:1.6}
+.log div{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.log .t{color:var(--dim)}.log .a{display:inline-block;width:32px;font-weight:700}
+.SCT{color:var(--cyan)}.MAP{color:var(--violet)}.JDG{color:var(--green)}.QNT{color:var(--amber)}.GRD{color:var(--red)}.EXE{color:#fff}.ORB{color:var(--cyan)}
+.orbwrap{position:relative;display:flex;flex-direction:column}
+.orbwrap canvas{flex:1;width:100%;min-height:0}
+.orbhead{position:absolute;inset:10px 12px auto;display:flex;justify-content:space-between;pointer-events:none}
+.orbfoot{position:absolute;inset:auto 12px 10px;display:flex;justify-content:space-between;pointer-events:none;color:var(--dim);font-size:9px;letter-spacing:.12em;text-transform:uppercase}
+.stack{flex:1;overflow:hidden;display:flex;flex-direction:column;gap:6px}
+.card{border:1px solid var(--line);border-left:3px solid var(--amber);padding:6px 8px;background:var(--bg);animation:slide .35s ease-out;display:grid;grid-template-columns:1fr auto;row-gap:2px}
+.card.enter{border-left-color:var(--green)}.card.block{border-left-color:var(--red)}
+.card .v{font-size:9px;letter-spacing:.1em;color:var(--amber)}.card.enter .v{color:var(--green)}.card.block .v{color:var(--red)}
+.card .sym{color:#fff;font-weight:500}.card .why{grid-column:1/-1;color:var(--dim);font-size:9px}
+.card .score{font-weight:700;color:#fff}
+.card .bar{grid-column:1/-1;height:2px;background:var(--line)}.card .bar i{display:block;height:100%;background:currentColor}
+@keyframes slide{from{opacity:0;transform:translateX(12px)}}
+.rail{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line)}
+.agents{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;flex:1;align-content:center}
+.agent{text-align:center;display:flex;flex-direction:column;align-items:center;gap:6px}
+.agent .ic{width:46px;height:46px;border:1px solid var(--line);border-radius:6px;display:grid;place-items:center;position:relative}
+.agent .ic::after{content:"";position:absolute;inset:-1px;border-radius:6px;border:1px solid currentColor;opacity:0;transition:opacity .3s}
+.agent.live .ic::after{opacity:1;box-shadow:0 0 12px currentColor}
+.agent b{color:#fff;font-size:9px;letter-spacing:.12em}.agent span{color:var(--dim);font-size:8px}
+.states{display:grid;grid-template-columns:1fr 1fr;gap:12px;flex:1;align-content:center}
+.pst{display:grid;grid-template-columns:110px 1fr 36px;align-items:center;gap:8px;font-size:10px}
+.pst .bar{height:6px;background:var(--line)}.pst .bar i{display:block;height:100%;transition:width .4s}
+.cost{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:10px}
+.cost b{color:#fff;font-weight:500}
+.blink{animation:blink 1.2s steps(2) infinite}@keyframes blink{50%{opacity:.2}}
+@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+@media (max-width:900px){.app{height:auto;grid-template-rows:auto}.body{grid-template-columns:1fr}.body>*{min-height:320px}.rail{grid-template-columns:1fr}.stat{display:none}body{padding-inline:0}}
+</style>
+
+<div class="app">
+  <header class="top">
+    <div class="logo">QO</div>
+    <div class="brand"><b>ORB</b> // SOLANA LAUNCH SELECTOR <span>pump.fun · pumpswap · +60% first · −30% first · neither in 60 min</span></div>
+    <div class="stat">
+      <div><div class="lab">launches 24h</div><div class="big" id="s-launch">0</div></div>
+      <div><div class="lab">blocked</div><div class="big" id="s-block">0</div></div>
+      <div><div class="lab">signals</div><div class="big" id="s-sig">0</div></div>
+      <div><div class="lab">utc</div><div class="big" id="s-clock">--:--:--</div></div>
+    </div>
+  </header>
+
+  <div class="ticker"><div class="tag">● LIVE</div><div class="roll" id="ticker"></div></div>
+
+  <div class="body">
+    <div class="col">
+      <section class="panel" style="flex:none">
+        <h2><i>◆</i> Core model <small id="mode">in training · <span class="blink">●</span> paper</small></h2>
+        <div class="lab">labels measured</div>
+        <div class="huge" id="labels">0</div>
+        <div class="kv">
+          <div><div class="lab">tp first</div><div class="big" id="k-tp">—</div></div>
+          <div><div class="lab">sl first</div><div class="big red" id="k-sl">—</div></div>
+          <div><div class="lab">timeout</div><div class="big amber" id="k-to">—</div></div>
+        </div>
+      </section>
+      <section class="panel" style="flex:none">
+        <h2><i>◆</i> Observables <small>7 signals · 30 min</small></h2>
+        <div id="signals"></div>
+      </section>
+      <section class="panel">
+        <h2><i>◆</i> Life of a decision <small>agent trace</small></h2>
+        <div class="log" id="log"></div>
+      </section>
+    </div>
+
+    <div class="orbwrap">
+      <canvas id="orb"></canvas>
+      <div class="orbhead"><h2 class="lab" style="margin:0"><span style="color:var(--cyan)">◆</span> THE ORB · one point per launch · colour = outcome · radius = model score</h2><span class="lab" id="orbcount">0 states</span></div>
+      <div class="orbfoot"><span>● <span style="color:var(--green)">tp first</span> &nbsp; ● <span style="color:var(--red)">sl first</span> &nbsp; ● <span style="color:var(--amber)">timeout</span> &nbsp; ● <span style="color:var(--dim)">unlabelled</span></span><span>drag to rotate</span></div>
+    </div>
+
+    <section class="panel">
+      <h2><i>◆</i> Decision stack <small>enter · skip · block</small></h2>
+      <div class="stack" id="stack"></div>
+    </section>
+  </div>
+
+  <div class="rail">
+    <section class="panel">
+      <h2><i>◆</i> Six agents <small>observations in → decisions out</small></h2>
+      <div class="agents" id="agents"></div>
+    </section>
+    <section class="panel">
+      <h2><i>◆</i> State builder <small id="sb-sym">—</small></h2>
+      <div class="states">
+        <div>
+          <div class="pst"><span style="color:var(--green)">TP · +60% first</span><div class="bar"><i id="p-tp" style="background:var(--green);width:25%"></i></div><b id="pv-tp">0.25</b></div>
+          <div class="pst"><span style="color:var(--amber)">TIME · neither</span><div class="bar"><i id="p-to" style="background:var(--amber);width:25%"></i></div><b id="pv-to">0.25</b></div>
+          <div class="pst"><span style="color:var(--red)">SL · −30% first</span><div class="bar"><i id="p-sl" style="background:var(--red);width:50%"></i></div><b id="pv-sl">0.50</b></div>
+        </div>
+        <div>
+          <div class="lab">entry threshold after costs</div>
+          <div class="big">p(tp) &gt; <span id="thr">0.40</span></div>
+          <div class="cost"><span>gross <b>+60/−30</b></span><span>costs <b id="costs">4.8%</b></span><span>verdict <b id="verdict">—</b></span></div>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/0.160.0/three.min.js"></script>
+<script>
+// ---------- data layer: fake feed now, same message shapes the FastAPI websocket will emit ----------
+const $=id=>document.getElementById(id);
+const COSTS=0.048, THR=(0.30+COSTS)/(0.60+0.30); // break-even p(tp): win*0.6 - (1-win)*0.3 = costs
+$('thr').textContent=THR.toFixed(2); $('costs').textContent=(COSTS*100).toFixed(1)+'%';
+const AGENTS=[['SCT','SCOUT','launches · curves'],['MAP','CARTOGRAPHER','wallet links'],['JDG','JUDGE','trader edge'],['QNT','QUANT','costs · ev'],['GRD','GUARD','rug checks'],['EXE','EXECUTOR','tp · sl · time']];
+const SIGNALS=[['launch rate','new tokens / min','SCT',14,' /m'],['curve inflow','sol into curves / min','SCT',120,' SOL'],['followed flow','followed buys / 1m','JDG',3,''],['bundled share','bought in launch slot','MAP',22,'%'],['creator risk','from serial creators','MAP',40,'%'],['graduation rate','curves completed / 1h','SCT',0.9,''],['market phase','above open · 24h','SCT',9,'%']];
+const SYMS='BLONUT NEBLORD PEBDOG ZAPMOON RIZBAT TURDOG MUNNUT HOPHOOD BLOINU LUXINU RENAPE DOLGAPE MOGOWL FLUPUP MINTOAD TOKDOG SNAMAX ZAPMAX GOOGIX'.split(' ');
+const rnd=(a,b)=>a+Math.random()*(b-a), pick=a=>a[Math.random()*a.length|0];
+
+// ---------- agents ----------
+$('agents').innerHTML=AGENTS.map(([k,n,d])=>`<div class="agent ${k}" id="ag-${k}"><div class="ic"><svg width="22" height="22" viewBox="0 0 22 22" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="11" cy="11" r="8"/><circle cx="11" cy="11" r="3"/></svg></div><b>${n}</b><span>${d}</span></div>`).join('');
+const pulse=k=>{const e=$("ag-"+k);if(!e)return;e.classList.add('live');setTimeout(()=>e.classList.remove('live'),500)};
+
+// ---------- signals with sparklines ----------
+const spark={};
+$('signals').innerHTML=SIGNALS.map(([n,d,who,v,u],i)=>`<div class="sig"><div class="name"><b>${n}</b><span>${d}</span></div><canvas id="sp${i}"></canvas><span class="val ${who}" id="sv${i}">${v}${u}</span><span class="who">${who}</span></div>`).join('');
+SIGNALS.forEach((s,i)=>{spark[i]={hist:Array.from({length:40},()=>s[3]*rnd(.7,1.3)),c:$('sp'+i)}});
+function drawSpark(i){const {hist,c}=spark[i];const w=c.width=c.clientWidth*2,h=c.height=44,g=c.getContext('2d');const mn=Math.min(...hist),mx=Math.max(...hist)||1;
+  g.strokeStyle=getComputedStyle(document.documentElement).getPropertyValue(['--cyan','--cyan','--green','--red','--amber','--cyan','--cyan'][i]);g.lineWidth=2;g.beginPath();
+  hist.forEach((v,j)=>{const x=j/(hist.length-1)*w,y=h-4-(v-mn)/(mx-mn||1)*(h-8);j?g.lineTo(x,y):g.moveTo(x,y)});g.stroke();
+  g.fillStyle=g.strokeStyle;g.beginPath();g.arc(w-2,h-4-(hist.at(-1)-mn)/(mx-mn||1)*(h-8),3,0,7);g.fill()}
+function tickSignals(){SIGNALS.forEach((s,i)=>{const h=spark[i].hist;h.push(Math.max(0,h.at(-1)*rnd(.9,1.1)));h.shift();$('sv'+i).textContent=(s[3]<2?h.at(-1).toFixed(1):Math.round(h.at(-1)))+s[4];drawSpark(i)})}
+
+// ---------- log ----------
+const log=(a,msg)=>{const t=clk().toISOString().slice(11,19);const d=document.createElement('div');d.innerHTML=`<span class="t">${t}</span> <span class="a ${a}">${a}</span> ${msg}`;const L=$('log');L.prepend(d);while(L.children.length>40)L.lastChild.remove();pulse(a)};
+
+// ---------- ticker ----------
+const tick=[];const pushTick=s=>{tick.unshift(s);if(tick.length>14)tick.pop();$('ticker').innerHTML=(tick.concat(tick)).map(x=>`<span>${x}</span>`).join('')};
+
+// ---------- decision stack ----------
+const stackEl=$('stack');
+function decide(sym,p){const v=p.tp>THR?'enter':(p.block?'block':'skip');const c=document.createElement('div');c.className='card '+v;
+  c.innerHTML=`<span class="v">${v==='enter'?'TRADE ENTRY':v==='block'?'BLOCK · GRD':'SKIP · QNT'}</span><span class="score">${p.tp.toFixed(2)}</span><span class="sym">$${sym}</span><span></span><span class="why">${v==='enter'?'passed quant + guard → to executor':v==='block'?p.block:'ev below threshold after costs'}</span><div class="bar" style="color:${v==='enter'?'var(--green)':v==='block'?'var(--red)':'var(--amber)'}"><i style="width:${p.tp*100}%"></i></div>`;
+  stackEl.prepend(c);while(stackEl.children.length>9)stackEl.lastChild.remove();
+  $('sb-sym').textContent='$'+sym;$('p-tp').style.width=p.tp*100+'%';$('p-sl').style.width=p.sl*100+'%';$('p-to').style.width=p.to*100+'%';
+  $('pv-tp').textContent=p.tp.toFixed(2);$('pv-sl').textContent=p.sl.toFixed(2);$('pv-to').textContent=p.to.toFixed(2);
+  $('verdict').textContent=v.toUpperCase();$('verdict').style.color=v==='enter'?'var(--green)':v==='block'?'var(--red)':'var(--amber)';return v}
+
+// ---------- orb (three.js points) ----------
+const N=1800,canvas=$('orb');const renderer=new THREE.WebGLRenderer({canvas,antialias:true,alpha:true});
+const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,1,.1,100);cam.position.z=7;
+const pos=new Float32Array(N*3),col=new Float32Array(N*3),size=new Float32Array(N);
+const COLS={tp:[.24,.86,.52],sl:[1,.3,.37],to:[1,.7,.28],u:[.3,.36,.48]};
+const pts=[];for(let i=0;i<N;i++){const r=Math.cbrt(Math.random())*2.4,th=Math.random()*6.283,ph=Math.acos(rnd(-1,1));pts.push({r,th,ph,lab:'u',s:rnd(.4,1)});}
+function rebuild(){pts.forEach((p,i)=>{pos.set([p.r*Math.sin(p.ph)*Math.cos(p.th),p.r*Math.sin(p.ph)*Math.sin(p.th),p.r*Math.cos(p.ph)],i*3);col.set(COLS[p.lab],i*3);size[i]=p.s*(p.lab==='u'?3:6)});geo.attributes.position.needsUpdate=geo.attributes.color.needsUpdate=geo.attributes.size.needsUpdate=true}
+const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setAttribute('size',new THREE.BufferAttribute(size,1));
+const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexColors:true,
+  vertexShader:`attribute float size;varying vec3 vC;void main(){vC=color;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=size*(60./-mv.z);gl_Position=projectionMatrix*mv;}`,
+  fragmentShader:`varying vec3 vC;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;gl_FragColor=vec4(vC,smoothstep(.5,.1,d)*.9);}`});
+const cloud=new THREE.Points(geo,mat);scene.add(cloud);
+// radial spokes from the signal rail into the cloud
+const lines=new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(Array.from({length:120},()=>{const p=pick(pts);const v=new THREE.Vector3(p.r*Math.sin(p.ph)*Math.cos(p.th),p.r*Math.sin(p.ph)*Math.sin(p.th),p.r*Math.cos(p.ph));return [v.clone().multiplyScalar(1.6),v]}).flat()),new THREE.LineBasicMaterial({color:0x3ddcff,transparent:true,opacity:.12}));scene.add(lines);
+let drag=null,rx=0,ry=0;canvas.onpointerdown=e=>drag=[e.clientX,e.clientY];canvas.onpointerup=()=>drag=null;canvas.onpointermove=e=>{if(drag){ry+=(e.clientX-drag[0])*.005;rx+=(e.clientY-drag[1])*.005;drag=[e.clientX,e.clientY]}};
+function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;renderer.setSize(w,h,false);renderer.setPixelRatio(Math.min(devicePixelRatio,2));cam.aspect=w/h;cam.updateProjectionMatrix()}
+addEventListener('resize',resize);resize();rebuild();
+(function frame(t){cloud.rotation.y=lines.rotation.y=ry+t*.00008;cloud.rotation.x=lines.rotation.x=rx;renderer.render(scene,cam);requestAnimationFrame(frame)})(0);
+
+// ---------- clock + counters ----------
+let launches=10585,blocked=7123,signals=52,labels=1318,cnt={tp:330,sl:660,to:328};
+let replayNow=null;const clk=()=>replayNow==null?new Date():new Date(replayNow*1000); // replay mode shows recorded UTC
+setInterval(()=>$('s-clock').textContent=clk().toISOString().slice(11,19),1000);
+function counters(){$('s-launch').textContent=launches.toLocaleString();$('s-block').textContent=blocked.toLocaleString();$('s-sig').textContent=signals;$('labels').textContent=labels.toLocaleString();
+  const n=cnt.tp+cnt.sl+cnt.to||1;$('k-tp').textContent=(cnt.tp/n*100).toFixed(0)+'%';$('k-sl').textContent=(cnt.sl/n*100).toFixed(0)+'%';$('k-to').textContent=(cnt.to/n*100).toFixed(0)+'%';$('orbcount').textContent=N+' states · '+labels+' labelled'}
+pts.slice(0,labels).forEach(p=>p.lab=Math.random()<.25?'tp':Math.random()<.67?'sl':'to');rebuild();counters();
+
+// ---------- live feed: websocket -> same handlers ----------
+const DEMO=new URLSearchParams(location.search).has('demo');
+const idx={},symOf={},blockedSet=new Map();let nextPt=0;
+function onWs(m){
+  if(m.type==='launch'){const sym=m.symbol||m.mint.slice(0,6);symOf[m.mint]=sym;launches++;
+    const q=pts[nextPt++%N];q.lab='u';q.s=1.4;idx[m.mint]=pts.indexOf(q);rebuild();
+    log('SCT',`launch decoded <b>$${sym}</b> · mcap ${(m.mcap_sol||0).toFixed(1)} SOL`);pushTick(`<b>LAUNCH</b> $${sym}`);counters()}
+  else if(m.type==='guard'){const sym=symOf[m.mint]||m.mint.slice(0,6);
+    if(m.blocked){const why=m.reason||'blocked';blockedSet.set(m.mint,why);blocked++;log('GRD',`<span class="GRD">blocked</span> $${sym} · ${why}`);decide(sym,{tp:0,sl:1,to:0,block:why});pushTick(`<b>BLOCK</b> $${sym}${m.bundled_share!=null?' '+(m.bundled_share*100|0)+'%':''}`)}
+    else log('GRD',`pass $${sym}`);counters()}
+  else if(m.type==='label'){const sym=symOf[m.mint]||m.mint.slice(0,6);let i=idx[m.mint];if(i==null){i=idx[m.mint]=nextPt++%N}
+    pts[i].lab=m.label;pts[i].s=1;cnt[m.label]++;labels++;rebuild();counters();pushTick(`<b>LABELLED</b> $${sym} ${m.label.toUpperCase()}`)}
+  else if(m.type==='score'){const sym=symOf[m.mint]||m.mint.slice(0,6);const p={tp:m.p_tp,sl:m.p_sl,to:m.p_to};
+    log('ORB',`state · tp ${p.tp.toFixed(2)} · sl ${p.sl.toFixed(2)} · time ${p.to.toFixed(2)}${m.split==='test'?' · test':''}`);
+    const ev=p.tp*.6-p.sl*.3-COSTS;log('QNT',`net ev ${ev>0?'+':''}${(ev*100).toFixed(1)}% · costs ${(COSTS*100).toFixed(1)}%`);
+    if(blockedSet.has(m.mint))p.block=blockedSet.get(m.mint);
+    const v=decide(sym,p);pushTick(`<b>${v==='enter'?'ENTRY':'SKIP'}</b> $${sym} ${p.tp.toFixed(2)}`)}
+  else if(m.type==='position'){const sym=symOf[m.mint]||m.mint.slice(0,6);const pct=(m.pnl_pct*100).toFixed(1);
+    log('EXE',`<b>${m.reason}</b> $${sym} · ${m.pnl_pct>=0?'+':''}${pct}% · ${m.pnl_sol>=0?'+':''}${m.pnl_sol.toFixed(4)} SOL`);
+    pushTick(`<b>${m.reason==='tp'?'ENTRY':'EXIT'}</b> $${sym} ${m.reason.toUpperCase()} ${m.pnl_pct>=0?'+':''}${pct}%`)}
+  else if(m.type==='stats'){launches=m.launches_24h;blocked=m.blocked;cnt=Object.assign({tp:0,sl:0,to:0},m.labels);labels=cnt.tp+cnt.sl+cnt.to;counters();
+    const set=(i,v)=>{const h=spark[i].hist;h.push(v);h.shift();$('sv'+i).textContent=(v<2?v.toFixed(1):Math.round(v))+SIGNALS[i][4];drawSpark(i)};
+    set(0,m.launch_rate_per_min);set(1,Math.max(0,m.sol_inflow_per_min));
+    if(m.guard&&m.guard.bundled_share_mean!=null){set(3,m.guard.bundled_share_mean*100);set(4,(m.guard.serial_creator_rate||0)*100)}
+    if(m.graduated_1h!=null)set(5,m.graduated_1h);
+    if(m.paper){signals=m.paper.n||0;counters()}}}
+function demo(){
+// ---------- fake event loop (?demo, or no backend reachable) ----------
+$('mode').innerHTML='demo · fake feed';
+function onLaunch(){const sym=pick(SYMS),buyers=rnd(5,40)|0,bund=rnd(0,.6),p={};launches++;
+  log('SCT',`launch decoded <b>$${sym}</b> · ${buyers} buyers · curve ${rnd(2,20).toFixed(0)}%`);
+  setTimeout(()=>log('MAP',`${buyers} buyers · ${Math.round(bund*buyers)} linked to one funder · bundle ${(bund*100|0)}%`),250);
+  setTimeout(()=>log('JDG',`followed wallet · p(edge) ${rnd(.4,.95).toFixed(2)} · ${rnd(0,4)|0} in this coin`),500);
+  if(bund>.45){blocked++;p.block=`${(bund*100|0)}% of buyers share one funder`;setTimeout(()=>{log('GRD',`<span class="GRD">blocked</span> $${sym} · ${p.block}`);Object.assign(p,{tp:rnd(.05,.3),sl:.6,to:.2});decide(sym,p);pushTick(`<b>BLOCK</b> $${sym} ${(bund*100|0)}%`);counters()},800);return}
+  const tp=rnd(.1,.6),sl=rnd(.2,.6)*(1-tp),to=1-tp-sl;Object.assign(p,{tp,sl,to});
+  setTimeout(()=>{log('ORB',`state · tp ${tp.toFixed(2)} · sl ${sl.toFixed(2)} · time ${to.toFixed(2)}`);log('QNT',`net ev ${((tp*.6-sl*.3)-COSTS>0?'+':'')}${(((tp*.6-sl*.3)-COSTS)*100).toFixed(1)}% · costs ${(COSTS*100).toFixed(1)}%`);
+    const v=decide(sym,p);if(v==='enter'){signals++;log('EXE',`<b>entry $${sym}</b> · 0.13 SOL · tp +60 · sl −30 · 60 min`);pushTick(`<b>ENTRY</b> $${sym} net ev +${(((tp*.6-sl*.3)-COSTS)*100).toFixed(1)}%`)}else pushTick(`<b>SKIP</b> $${sym} ${tp.toFixed(2)}`);counters()},900);
+  // orb: a fresh point lights up as unlabelled, labels later
+  const q=pts[labels%N];q.lab='u';q.s=1.4;rebuild();
+  setTimeout(()=>{const lab=Math.random()<.25?'tp':Math.random()<.67?'sl':'to';q.lab=lab;cnt[lab]++;labels++;rebuild();counters();pushTick(`<b>LABELLED</b> $${sym} ${lab.toUpperCase()}`)},rnd(6000,14000))}
+setInterval(onLaunch,2600);setInterval(tickSignals,1500);tickSignals();
+for(let i=0;i<4;i++)setTimeout(onLaunch,i*400);
+}
+// ---------- replay: recorded events from replay.json, 20x, looping ----------
+const SPEED=20,FF=1800; // first 30 min of the file are applied instantly to pre-seed the orb/counters
+async function replay(ev){
+  const hhmm=x=>new Date(x*1000).toISOString().slice(11,16);
+  $('mode').textContent=`replay · recorded ${hhmm(ev[0].at)}–${hhmm(ev.at(-1).at)} UTC · ${SPEED}×`;
+  for(;;){
+    pts.forEach(p=>{p.lab='u';p.s=1});nextPt=0;for(const k in idx)delete idx[k];blockedSet.clear();
+    cnt={tp:0,sl:0,to:0};launches=blocked=signals=labels=0;
+    let i=0;const apply=e=>{replayNow=e.at;onWs(e)};
+    while(i<ev.length&&ev[i].t<FF)apply(ev[i++]);
+    rebuild();counters();
+    const t0=performance.now()-FF/SPEED*1000; // wall time at which file-time 0 would have started
+    while(i<ev.length){
+      const wait=t0+ev[i].t/SPEED*1000-performance.now();
+      if(wait>0)await new Promise(r=>setTimeout(r,wait));
+      apply(ev[i++]);
+    }
+    await new Promise(r=>setTimeout(r,3000));
+  }
+}
+const startReplay=()=>fetch('replay.json').then(r=>r.ok?r.json():Promise.reject()).then(ev=>{if(!ev.length)throw 0;$('ticker').parentNode.querySelector('.tag').textContent='● REPLAY';replay(ev)});
+const REPLAY=new URLSearchParams(location.search).has('replay');
+if(DEMO)demo();
+else if(REPLAY){
+  pts.forEach(p=>p.lab='u');rebuild();cnt={tp:0,sl:0,to:0};launches=blocked=signals=labels=0;counters();
+  startReplay().catch(demo);
+}
+else{
+  pts.forEach(p=>p.lab='u');rebuild();cnt={tp:0,sl:0,to:0};launches=blocked=signals=labels=0;counters();
+  let live=false;const fallback=()=>startReplay().catch(demo);
+  (function conn(){let ws;try{ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws')}catch(e){return fallback()}
+    ws.onmessage=e=>{live=true;onWs(JSON.parse(e.data))};ws.onclose=()=>live?setTimeout(conn,2000):fallback()})();
+}
+</script>
