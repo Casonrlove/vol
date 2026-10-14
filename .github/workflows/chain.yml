@@ -1,6 +1,6 @@
 name: record-chain
 on:
-  schedule: [{cron: "20 20 * * 1-5"}]   # 16:20 ET weekdays (20:20 UTC; 21:20 UTC in winter — edit if it matters)
+  schedule: [{cron: "20 20 * * 1-5"}, {cron: "20 21 * * 1-5"}]   # both 16:20 ET across DST; recorder is idempotent
   workflow_dispatch:
 permissions: {contents: write}
 jobs:
