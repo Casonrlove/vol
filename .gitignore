@@ -4,3 +4,4 @@ vol.db*
 __pycache__/
 model_*.txt
 static/replay.json
+live.db*

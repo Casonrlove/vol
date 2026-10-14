@@ -68,6 +68,9 @@ body{margin:0;background:var(--bg);color:var(--fg);font:11px/1.45 var(--mono);fo
 .cost{display:flex;justify-content:space-between;margin-top:8px;padding-top:8px;border-top:1px solid var(--line);font-size:10px}
 .cost b{color:#fff;font-weight:500}
 .spd button{font:inherit;font-size:9px;background:none;border:1px solid var(--line);color:var(--dim);padding:0 5px;margin-left:3px;cursor:pointer;border-radius:2px}.spd button.on{color:var(--cyan);border-color:var(--cyan)}
+.up{color:var(--green)}.dn{color:var(--red)}.TICK{color:var(--amber)}
+.pill{font-size:9px;padding:0 7px;border:1px solid currentColor;border-radius:9px;letter-spacing:.12em;margin-left:6px;vertical-align:1px}
+.pill.open{color:var(--green)}.pill.closed{color:var(--dim)}
 .blink{animation:blink 1.2s steps(2) infinite}@keyframes blink{50%{opacity:.2}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important}}
 @media (max-width:900px){.app{height:auto;grid-template-rows:auto}.body{grid-template-columns:1fr}.body>*{min-height:320px}.rail{grid-template-columns:1fr}.stat{display:none}body{padding-inline:0}}
@@ -81,6 +84,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:11px/1.45 var(--mono);fo
       <div><div class="lab">rows labelled</div><div class="big" id="s-n">0</div></div>
       <div><div class="lab">hit rate (base)</div><div class="big" id="s-hit">—</div></div>
       <div><div class="lab">model hit rate (p&gt;0.5, test)</div><div class="big" id="s-mhit">—</div></div>
+      <div><div class="lab">ET</div><div class="big"><span id="clock">—</span><span class="pill closed" id="pill">—</span></div></div>
       <div><div class="lab">VIX</div><div class="big" id="s-vix">—</div></div>
     </div>
   </header>
@@ -100,7 +104,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:11px/1.45 var(--mono);fo
         </div>
       </section>
       <section class="panel" style="flex:none">
-        <h2><i>◆</i> Observables <small>7 signals · last 40 days</small></h2>
+        <h2><i>◆</i> Observables <small id="sig-sub">7 signals · last 40 days</small></h2>
         <div id="signals"></div>
       </section>
       <section class="panel">
@@ -112,11 +116,11 @@ body{margin:0;background:var(--bg);color:var(--fg);font:11px/1.45 var(--mono);fo
     <div class="orbwrap">
       <canvas id="orb"></canvas>
       <div class="orbhead"><h2 class="lab" style="margin:0"><span style="color:var(--cyan)">◆</span> THE ORB · one point per ticker-day · colour = outcome · radius = model p</h2><span class="lab" id="orbcount">0 points</span></div>
-      <div class="orbfoot"><span>← calm · RV5/RV20 · stressed → &nbsp; earnings soon ↓ &nbsp; VIX ↑</span><span>● <span style="color:var(--green)">beat expectation</span> &nbsp; ● <span style="color:var(--red)">didn't</span> &nbsp; ● <span style="color:var(--dim)">pending</span> &nbsp; drag to rotate</span></div>
+      <div class="orbfoot"><span>← calm · RV5/RV20 · stressed → &nbsp; earnings soon ↓ &nbsp; VIX ↑</span><span>● <span style="color:var(--green)">beat expectation</span> &nbsp; ● <span style="color:var(--red)">didn't</span> &nbsp; ● <span style="color:var(--dim)">pending</span> &nbsp; <span id="todaykey" style="display:none">◉ today: <span style="color:#8c99ad">&lt;0.5×</span> <span style="color:var(--amber)">0.5–1×</span> <span style="color:var(--green)">≥1× expected</span> &nbsp;</span>drag to rotate</span></div>
     </div>
 
     <section class="panel">
-      <h2><i>◆</i> Decision stack <small>watch · high-p rows</small></h2>
+      <h2><i>◆</i> Decision stack <small id="stack-sub">watch · high-p rows</small></h2>
       <div class="stack" id="stack"></div>
     </section>
   </div>
@@ -137,7 +141,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:11px/1.45 var(--mono);fo
         <div>
           <div class="pst"><span style="color:var(--amber)">IMPLIED move</span><div class="bar"><i id="b-im" style="background:var(--amber);width:0"></i></div><b id="bv-im">—</b></div>
           <div class="pst"><span style="color:var(--violet)">EXPECTED (rv20)</span><div class="bar"><i id="b-em" style="background:var(--violet);width:0"></i></div><b id="bv-em">—</b></div>
-          <div class="pst"><span style="color:var(--green)">REALISED 5d</span><div class="bar"><i id="b-fw" style="background:var(--green);width:0"></i></div><b id="bv-fw">—</b></div>
+          <div class="pst"><span style="color:var(--green)" id="lbl-fw">REALISED 5d</span><div class="bar"><i id="b-fw" style="background:var(--green);width:0"></i></div><b id="bv-fw">—</b></div>
         </div>
       </div>
     </section>
@@ -173,7 +177,7 @@ function observe(m){SIGNALS.forEach((s,i)=>{const v=m[SIGKEYS[i]];if(v==null)ret
 // ---------- log / ticker ----------
 let curDate='';
 const log=(a,msg,date)=>{const d=document.createElement('div');d.innerHTML=`<span class="t">${date||curDate}</span> <span class="a ${a}">${a}</span> ${msg}`;const L=$('log');L.prepend(d);while(L.children.length>40)L.lastChild.remove();pulse(a)};
-const tick=[];const pushTick=s=>{tick.unshift(s);if(tick.length>14)tick.pop();$('ticker').innerHTML=(tick.concat(tick)).map(x=>`<span>${x}</span>`).join('')};
+const tick=[];const pushTick=s=>{if(mode==='live')return;tick.unshift(s);if(tick.length>14)tick.pop();$('ticker').innerHTML=(tick.concat(tick)).map(x=>`<span>${x}</span>`).join('')};
 
 // ---------- decision stack ----------
 const stackEl=$('stack'),cards=new Map();
@@ -189,10 +193,10 @@ const N=40000,canvas=$('orb');const renderer=new THREE.WebGLRenderer({canvas,ant
 const scene=new THREE.Scene(),cam=new THREE.PerspectiveCamera(45,1,.1,100);cam.position.z=7;
 const pos=new Float32Array(N*3),col=new Float32Array(N*3),size=new Float32Array(N);
 const COLS={g:[.24,.86,.52],r:[1,.3,.37],u:[.3,.36,.48]};
-const pts=Array.from({length:N},()=>({x:0,y:0,z:0,lab:'u',p:null}));let used=0,dirty=true;
+const pts=Array.from({length:N},()=>({x:0,y:0,z:0,lab:'u',p:null,dim:false}));let used=0,dirty=true;
 const cl=(v,a,b)=>Math.min(b,Math.max(a,v));
 const place=(m)=>[cl(Math.log(m.x>0?m.x:1)*2,-2.4,2.4),-2.4+cl(m.y,0,90)/90*4.8,cl((m.z-10)/50*4.8-2.4,-2.4,2.4)]; // log rv5/rv20, days to earnings, VIX
-function rebuild(){for(let i=0;i<used;i++){const p=pts[i];pos[i*3]=p.x;pos[i*3+1]=p.y;pos[i*3+2]=p.z;col.set(COLS[p.lab],i*3);size[i]=p.p==null?.6:.9+p.p*2.2}
+function rebuild(){for(let i=0;i<used;i++){const p=pts[i];pos[i*3]=p.x;pos[i*3+1]=p.y;pos[i*3+2]=p.z;col.set(COLS[p.lab],i*3);if(p.dim)for(let k=0;k<3;k++)col[i*3+k]*=.3;size[i]=p.p==null?.6:.9+p.p*2.2}
   geo.setDrawRange(0,used);geo.attributes.position.needsUpdate=geo.attributes.color.needsUpdate=geo.attributes.size.needsUpdate=true;dirty=false}
 const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.BufferAttribute(pos,3));geo.setAttribute('color',new THREE.BufferAttribute(col,3));geo.setAttribute('size',new THREE.BufferAttribute(size,1));
 const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:THREE.AdditiveBlending,vertexColors:true,
@@ -200,15 +204,27 @@ const mat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,blending:T
   fragmentShader:`varying vec3 vC;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;gl_FragColor=vec4(vC,smoothstep(.5,.1,d)*.6);}`});
 const grp=new THREE.Group(),cloud=new THREE.Points(geo,mat);cloud.frustumCulled=false;grp.add(cloud);scene.add(grp);
 const A=2.4;grp.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints([[-A,0,0],[A,0,0],[0,-A,0],[0,A,0],[0,0,-A],[0,0,A]].map(a=>new THREE.Vector3(...a))),new THREE.LineBasicMaterial({color:0x3ddcff,transparent:true,opacity:.25})));
+// today points: 16 slots, pulsing, size = realised ratio, colour = bucket
+const TN=16,tpos=new Float32Array(TN*3),tcol=new Float32Array(TN*3),tsize=new Float32Array(TN),tph=new Float32Array(TN).map((_,i)=>i*1.7);
+const tgeo=new THREE.BufferGeometry();tgeo.setAttribute('position',new THREE.BufferAttribute(tpos,3));tgeo.setAttribute('color',new THREE.BufferAttribute(tcol,3));tgeo.setAttribute('size',new THREE.BufferAttribute(tsize,1));tgeo.setAttribute('phase',new THREE.BufferAttribute(tph,1));tgeo.setDrawRange(0,0);
+const tmat=new THREE.ShaderMaterial({transparent:true,depthWrite:false,depthTest:false,blending:THREE.AdditiveBlending,vertexColors:true,uniforms:{uT:{value:0}},
+  vertexShader:`attribute float size;attribute float phase;uniform float uT;varying vec3 vC;void main(){vC=color;vec4 mv=modelViewMatrix*vec4(position,1.);gl_PointSize=size*(1.+.3*sin(uT*3.+phase))*(60./-mv.z);gl_Position=projectionMatrix*mv;}`,
+  fragmentShader:`varying vec3 vC;void main(){float d=length(gl_PointCoord-.5);if(d>.5)discard;gl_FragColor=vec4(vC,smoothstep(.5,.15,d)*.95);}`});
+const todayPts=new THREE.Points(tgeo,tmat);todayPts.frustumCulled=false;grp.add(todayPts);
+const TCOL=[[.55,.6,.68],[1,.7,.28],[.24,.86,.52]],tslot=new Map();
+function setToday(m){let i=tslot.get(m.ticker);if(i==null){if(tslot.size>=TN)return;i=tslot.size;tslot.set(m.ticker,i);tgeo.setDrawRange(0,tslot.size)}
+  const r=m.realised_ratio||0;tpos.set(place({x:m.x,y:m.days_to_earnings==null?90:m.days_to_earnings,z:m.vix==null?20:m.vix}),i*3);
+  tcol.set(TCOL[r>=1?2:r>=.5?1:0],i*3);tsize[i]=2.5+2*cl(r,0,2);
+  ['position','color','size'].forEach(k=>tgeo.attributes[k].needsUpdate=true)}
 let drag=null,rx=.35,ry=0;canvas.onpointerdown=e=>drag=[e.clientX,e.clientY];canvas.onpointerup=()=>drag=null;canvas.onpointermove=e=>{if(drag){ry+=(e.clientX-drag[0])*.005;rx+=(e.clientY-drag[1])*.005;drag=[e.clientX,e.clientY]}};
 function resize(){const w=canvas.clientWidth,h=canvas.clientHeight;renderer.setSize(w,h,false);renderer.setPixelRatio(Math.min(devicePixelRatio,2));cam.aspect=w/h;cam.updateProjectionMatrix()}
 addEventListener('resize',resize);resize();rebuild();
-(function frame(t){if(dirty)rebuild();grp.rotation.y=ry+t*.00008;grp.rotation.x=rx;renderer.render(scene,cam);requestAnimationFrame(frame)})(0);
+(function frame(t){if(dirty)rebuild();tmat.uniforms.uT.value=t/1000;grp.rotation.y=ry+t*.00008;grp.rotation.x=rx;renderer.render(scene,cam);requestAnimationFrame(frame)})(0);
 
 // ---------- state ----------
-let D={n:0,hit:null,mhit:null,mn:0,nbi:0,vix:null};
+const T={};let D={n:0,hit:null,mhit:null,mn:0,nbi:0,vix:null};
 const idx=new Map();let nextPt=0,mode='';
-function counters(){$('s-n').textContent=D.n.toLocaleString();$('s-hit').textContent=pc(D.hit);$('s-mhit').textContent=pc(D.mhit);$('s-vix').textContent=D.vix==null?'—':D.vix.toFixed(1);
+function counters(){$('s-n').textContent=D.n.toLocaleString();$('s-hit').textContent=pc(D.hit);$('s-mhit').textContent=pc(D.mhit);if(!T['^VIX'])$('s-vix').textContent=D.vix==null?'—':D.vix.toFixed(1);
   $('labels').textContent=D.n.toLocaleString();const b=D.hit==null?null:Math.round(D.hit*D.n);
   $('k-beat').textContent=b==null?'—':b.toLocaleString();$('k-not').textContent=b==null?'—':(D.n-b).toLocaleString();$('k-bi').textContent=D.nbi?D.nbi:'—';
   $('orbcount').textContent=used.toLocaleString()+' points · '+curDate}
@@ -226,19 +242,64 @@ function onRow(m,quiet){
   const key=m.ticker+'|'+m.date;let i=idx.get(key);const fresh=i==null;
   if(fresh){i=nextPt++%N;used=Math.max(used,Math.min(nextPt,N));idx.set(key,i);const [x,y,z]=place(m);Object.assign(pts[i],{x,y,z,p:m.p==null?null:m.p})}
   pts[i].lab=m.label==null?'u':m.label?'g':'r';dirty=true;
-  if(quiet)return;
+  if(!quiet)pts[i].dim=false;
+  if(quiet||(mode==='live'&&!settled))return;
   if(fresh){const hi=m.p!=null&&m.p>=.5;
     if(hi||mode==='live'){log('MODEL',`$${m.ticker} p=${f2(m.p)} · rv5/rv20 ${m.x.toFixed(1)} · ${m.y>=90?'no earnings':'earnings '+m.y+'d'}`,m.date);pushTick(`<b>${hi?'WATCH':'ROW'}</b> $${m.ticker} ${f2(m.p)}`)}
     ['BARS','FEATURES','MODEL'].forEach(pulse);if(m.y<=5)pulse('EARNINGS');if(m.im!=null)pulse('CHAIN');
-    if(hi&&!cards.has(key))card(m);
-    state(m,false);if(mode==='live')observe(m)}
+    if(hi&&!cards.has(key)&&mode!=='live')card(m);
+    if(mode!=='live'){state(m,false);}}
   if(m.label!=null){pulse('LABEL');const c=cards.get(key);if(c)cardLabel(c,m);
-    if(c||mode==='live'){log('LABEL',`$${m.ticker} ${m.date} → ${m.label?'beat':'inside'} (ratio ${f2(m.ratio)})`,m.date);state(m,true)}}
+    if(c||mode==='live'){log('LABEL',`$${m.ticker} ${m.date} → ${m.label?'beat':'inside'} (ratio ${f2(m.ratio)})`,m.date);if(mode!=='live')state(m,true)}}
 }
-function onWs(m){if(m.type==='day')onDay(m);else onRow(m)}
+function onWs(m){if(m.type==='day')onDay(m);else if(m.type==='tick')onTick(m);else onRow(m)}
+
+// ---------- live ticks ----------
+const REAL=['AMZN','AAPL','MSFT','NVDA','TSLA','META','GOOGL'],etp=(d=new Date())=>Object.fromEntries(new Intl.DateTimeFormat('en-US',{timeZone:'America/New_York',hour12:false,hour:'2-digit',minute:'2-digit',weekday:'short'}).formatToParts(d).map(p=>[p.type,p.value]));
+const isOpen=()=>{const p=etp(),m=(+p.hour%24)*60+ +p.minute;return !/Sat|Sun/.test(p.weekday)&&m>=565&&m<=965};
+const sgn=v=>(v>=0?'+':'')+(v*100).toFixed(1)+'%', xs=v=>v==null?'—':v.toFixed(1)+'×';
+const LSIG=[['move today','focus','focus','--cyan',sgn,t=>t.pct_today],['× expected','focus','focus','--amber',xs,t=>t.realised_ratio],['VIX','last','^VIX','--red',v=>v.toFixed(1),t=>t.last],['SPY today','vs prev close','SPY','--green',sgn,t=>t.pct_today],['days to earnings','focus','focus','--amber',v=>Math.round(v)+'d',t=>t.days_to_earnings],['implied move','focus','focus','--cyan',mv,t=>t.implied_move],['model p','as of close','focus','--cyan',f2,t=>t.p]];
+let focus=null;const bucket={},hist=LSIG.map(()=>[]);
+function liveInit(){mode='live';settled=false;setTimeout(()=>settled=true,3000);$('spd').style.display='none';$('todaykey').style.display='';$('lbl-fw').textContent='MOVE TODAY';
+  $('sig-sub').textContent='live ticks';$('stack-sub').textContent='watch · top p today';stackEl.innerHTML='';
+  document.querySelectorAll('.sig .name b').forEach((b,i)=>{b.textContent=LSIG[i][0];b.nextSibling.textContent=LSIG[i][1]});
+  LSIG.forEach((s,i)=>{SIGNALS[i]=[s[0],s[1],s[2],s[3],s[4]];hist[i]=spark[i].hist});
+  setInterval(clock,1000);clock();
+  fetch('replay.json').then(r=>r.ok?r.json():null).then(ev=>{if(!ev)return;let d='';for(const e of ev){if(e.type==='day'){d=e.date;continue}
+    const fresh=!idx.has(e.ticker+'|'+d);onRow(Object.assign({},e,{date:d}),true);if(fresh)pts[idx.get(e.ticker+'|'+d)].dim=true}dirty=true;counters()}).catch(()=>{})}
+function clock(){const p=etp(),o=isOpen();$('clock').textContent=p.hour.replace('24','00')+':'+p.minute;const pl=$('pill');pl.textContent=o?'OPEN':'CLOSED';pl.className='pill '+(o?'open':'closed');
+  $('mode').textContent=`live · ET ${p.hour.replace('24','00')}:${p.minute} · ${o?'open':'closed'}`}
+const etHM=ts=>{const p=etp(new Date(ts*1000));return p.hour.replace('24','00')+':'+p.minute};
+function renderTicker(){const all=REAL.concat(['SPY','^VIX']).filter(t=>T[t]);
+  const h=all.map(t=>{const m=T[t],c=m.pct_today>=0?'up':'dn';return `<span><b>${t.replace('^','')}</b> ${m.last.toFixed(2)} <i class="${c}" style="font-style:normal">${sgn(m.pct_today)}</i></span>`}).join('');
+  $('ticker').innerHTML=h+h}
+function renderStack(){const top=REAL.filter(t=>T[t]&&T[t].p!=null).sort((a,b)=>T[b].p-T[a].p).slice(0,3);
+  while(stackEl.children.length<top.length){const c=document.createElement('div');c.className='card';stackEl.append(c)}
+  top.forEach((t,i)=>{const m=T[t],c=stackEl.children[i];c.innerHTML=`<span class="v">WATCH</span><span class="score">${m.p.toFixed(2)}</span><span class="sym">$${t} · <span class="${m.pct_today>=0?'up':'dn'}">${sgn(m.pct_today)}</span> today</span><span></span><span class="why">${m.days_to_earnings==null?'no earnings known':'earnings in '+m.days_to_earnings+'d'} · ${xs(m.realised_ratio)} expected</span><div class="bar" style="color:var(--cyan)"><i style="width:${m.p*100}%"></i></div>`})}
+function renderFocus(){const m=T[focus];if(!m)return;
+  $('sb-sym').textContent=`$${focus} · live ${etHM(m.ts)} ET`;const mv0=Math.abs(m.pct_today),top=Math.max(.05,m.implied_move||0,m.expected_move_5d||0,mv0);
+  const bar=(k,v,mx,t)=>{$('b-'+k).style.width=v==null?0:cl(v/mx*100,0,100)+'%';$('bv-'+k).textContent=t};
+  bar('p',m.p,1,f2(m.p));bar('base',D.hit,1,f2(D.hit));bar('im',m.implied_move,top,mv(m.implied_move));bar('em',m.expected_move_5d,top,mv(m.expected_move_5d));bar('fw',mv0,top,mv(mv0));
+  const r=m.realised_ratio,v=$('verdict');v.textContent=r>=1?`beat expected · ${r.toFixed(1)}×`:`tracking · ${r.toFixed(1)}× expected`;v.style.color=r>=1?'var(--green)':r>=.5?'var(--amber)':'var(--dim)'}
+function onTick(m){
+  if(mode!=='live')return;
+  T[m.ticker]=m;
+  if(m.ticker==='^VIX')$('s-vix').textContent=m.last.toFixed(1);
+  const real=REAL.includes(m.ticker);
+  if(real){setToday(m);
+    const f=REAL.filter(t=>T[t]).sort((a,b)=>Math.abs(T[b].pct_today)-Math.abs(T[a].pct_today))[0];
+    if(f!==focus){focus=f;LSIG.forEach((s,i)=>{if(s[2]==='focus')hist[i].length=0})}
+    const b=Math.floor(Math.abs(m.pct_today)/(m.expected_move_5d||1e9)/.5),pb=bucket[m.ticker];
+    if(b>(pb==null?0:pb)){log('TICK',`$${m.ticker} ${sgn(m.pct_today)} · ${xs(m.realised_ratio)} expected`+(m.implied_move?` · ${(Math.abs(m.pct_today)/m.implied_move).toFixed(1)}× implied`:''),etHM(m.ts))}
+    bucket[m.ticker]=Math.max(b,pb||0)}
+  LSIG.forEach((s,i)=>{const t=s[2]==='focus'?focus:s[2];if(t!==m.ticker&&!(s[2]==='focus'&&m.ticker===focus))return;
+    const v=s[5](m);if(v==null)return;const h=hist[i];if(!h.length)h.push(v);h.push(v);if(h.length>40)h.shift();
+    $('sv'+i).textContent=s[4](v);$('sw'+i).textContent=t;drawSpark(i)});
+  if(m.ticker===focus||!T[focus]){renderFocus();$('orbcount').textContent=used.toLocaleString()+' points · focus $'+focus}
+  renderTicker();renderStack();pulse('BARS')}
 
 // ---------- replay: one trading day per tick, loop ----------
-let speed=1;
+let speed=1,settled=false;
 document.querySelectorAll('#spd button').forEach(b=>b.onclick=()=>{speed=+b.dataset.s;document.querySelectorAll('#spd button').forEach(x=>x.classList.toggle('on',x===b))});
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 async function replay(ev){
@@ -266,7 +327,7 @@ const startReplay=()=>fetch('replay.json').then(r=>r.ok?r.json():Promise.reject(
   let live=false;const fb=()=>startReplay().catch(()=>{$('mode').textContent='no data';$('ticker').parentNode.querySelector('.tag').textContent='● OFFLINE'});
   let ws;try{ws=new WebSocket((location.protocol==='https:'?'wss':'ws')+'://'+location.host+'/ws')}catch(e){return fb()}
   // ponytail: live mode wins only if the server sends something; no reconnect loop, reload to retry
-  ws.onmessage=e=>{if(!live){live=true;mode='live';$('mode').textContent='live';$('ticker').parentNode.querySelector('.tag').textContent='● LIVE';$('spd').style.display='none'}onWs(JSON.parse(e.data))};
+  ws.onmessage=e=>{if(!live){live=true;$('ticker').parentNode.querySelector('.tag').textContent='● LIVE';liveInit()}onWs(JSON.parse(e.data))};
   ws.onclose=()=>{if(!live)fb()};
 })();
 </script>

@@ -4,7 +4,9 @@ import asyncio, json, os, sqlite3
 import numpy as np, pandas as pd
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse, Response
+from datetime import datetime
 from features import dataset
+from live import market_open, LIVE, ET
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 DB = os.environ.get("VOL_DB") or os.path.join(HERE, "vol.db")
@@ -24,6 +26,23 @@ def q(sql, args=()):
         try: return [dict(r) for r in db.execute(sql, args)]
         finally: db.close()
     except sqlite3.OperationalError: return []
+
+
+def lq(sql, args=()):
+    """Same as q() but on live.db (read-only)."""
+    try:
+        db = sqlite3.connect(f"file:{LIVE}?mode=ro", uri=True, timeout=5); db.row_factory = sqlite3.Row
+        try: return [dict(r) for r in db.execute(sql, args)]
+        finally: db.close()
+    except sqlite3.OperationalError: return []
+
+
+def tickmsg(r):
+    return {**{k: v for k, v in r.items() if k != "rid"}, "type": "tick", "market_open": market_open(datetime.now(ET))}
+
+
+def latest_ticks():
+    return [tickmsg(r) for r in lq("select rowid rid, * from ticks where rowid in (select max(rowid) from ticks group by ticker)")]
 
 
 def build():
@@ -99,8 +118,15 @@ async def start():
         try: await loop.run_in_executor(None, S.load)
         except Exception as e: print("initial load failed:", repr(e))
         last = {t: (q(f"select max(rowid) m from {t}") or [{}])[0].get("m") or 0 for t in ("scores", "labels")}
+        lt = (lq("select max(rowid) m from ticks") or [{}])[0].get("m") or 0
         while True:
             await asyncio.sleep(5)
+            mx = (lq("select max(rowid) m from ticks") or [{}])[0].get("m") or 0
+            if mx < lt: lt = mx  # live.db was recreated
+            new = lq("select rowid rid, * from ticks where rowid>? order by rowid limit 500", (lt,))
+            if new:
+                lt = new[-1]["rid"]
+                if clients: await send([tickmsg(r) for r in new])
             out, miss = [], False
             for t in last:
                 mx = (q(f"select max(rowid) m from {t}") or [{}])[0].get("m") or 0
@@ -133,6 +159,7 @@ async def ws(ws: WebSocket):
     await ws.accept()
     if S.day: await ws.send_text(json.dumps(S.day))
     for m in getattr(S, "recent", []): await ws.send_text(json.dumps(m))
+    for m in latest_ticks(): await ws.send_text(json.dumps(m))
     clients.add(ws)
     try:
         while True: await ws.receive_text()
